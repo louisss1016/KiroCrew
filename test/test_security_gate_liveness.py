@@ -366,7 +366,14 @@ def _url_payload_command(n: int) -> str:
 #: Raised again, from 29,573, for the one ``pinned-order`` entry in
 #: ``paths._CREW_SECRET_LEAVES``: the person's pinned-session order is fenced from
 #: agent file tools like ``tag-grants`` beside it.
-_PACKAGE_LINE_BUDGET = 29_574
+#:
+#: Raised again, from 29,574, for the chat segment save: the link pass can hand
+#: back the addresses it replaced and the credential records take the per-delta
+#: ``defer_token_param``, so the save can check each value a streamed delta's
+#: redaction removed. No matcher moved. Seven more lines rewrite the blocked links
+#: longest first, so a blocked link that prefixes a longer one cannot leave the
+#: longer one's tail in the text.
+_PACKAGE_LINE_BUDGET = 29_590
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
