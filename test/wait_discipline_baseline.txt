@@ -21,6 +21,7 @@
  2 integration/test_memory_bindings.py
  1 integration/test_script_cron_sessions.py
  1 kiro_prerequisite_helpers.py
+ 1 md_notebook_helpers.py
  1 metrics/test_provider.py
  1 metrics/test_provider_otlp_destinations.py
  1 overload_fakes.py
@@ -239,7 +240,7 @@
  1 test_mcp_preflight.py
  1 test_mcp_shared.py
  3 test_mcp_shared_deferred_tools.py
- 7 test_md_notebook.py
+ 6 test_md_notebook_write_safety.py
  1 test_meetings_audio_import.py
  8 test_meetings_routes.py
  4 test_meetings_routes_lifecycle.py
