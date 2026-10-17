@@ -658,6 +658,10 @@ describe('AutoNudgePopover status line and Pause | Play controls', () => {
     renderWith(paused({ stopped_reason: reason, cycle_count: 3, max_cycles: 3 }))
     expect(status()!.textContent).toBe(expected)
     expect(status()!.className).toMatch(/\bbg-warn-subtle\b/)
+    // The warn hue, not `text-warn-fg`: that token is black in the dark themes
+    // and vanishes over the 12% wash, the same trap the info box dodges (#21335).
+    expect(status()!.className).toMatch(/\btext-warn-text\b/)
+    expect(status()!.className).not.toMatch(/\btext-warn-fg\b/)
     expect(title()).toBe('Paused')
     expect(screen.queryByText(/Stopped/)).toBeNull()
   })
@@ -690,6 +694,10 @@ describe('AutoNudgePopover status line and Pause | Play controls', () => {
     renderWith(running({ cycle_count: 2 }))
     expect(status()!.textContent).toMatch(/^Next cycle in .+$/)
     expect(status()!.className).toMatch(/\bbg-ok-subtle\b/)
+    // The ok hue, not `text-ok-fg`: that token is black in the dark themes and
+    // vanishes over the 12% wash, the same trap the info box dodges (#21335).
+    expect(status()!.className).toMatch(/\btext-ok-text\b/)
+    expect(status()!.className).not.toMatch(/\btext-ok-fg\b/)
     expect(title()).toBe('Goal active (cycle 2/3)')
     cleanup()
     renderWith(null)
