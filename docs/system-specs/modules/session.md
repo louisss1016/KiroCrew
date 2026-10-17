@@ -398,6 +398,16 @@ cleanup does not read durable session metadata. Tab close retires its nudge loop
 before other asynchronous work. After the last consumer and provider stop, cleanup
 releases only the captured identity, preserving any replacement session carrier.
 
+**Crew Mode** has no field of its own. It is a UI over the existing
+`kirocrew-conductor`: a chat is in Crew Mode exactly when its agent is that
+template. The composer switch is an ordinary `POST /api/chat/slots/{slot}/agent`
+naming the `template` namespace both ways. On names `kirocrew-conductor`; off
+sends an empty agent name, and the server stamps the configured default template,
+so off stays right while the dashboard's agent catalog is loading or unavailable.
+A person who wants every new chat
+on the conductor sets it as the default agent (`agent.default_agent`); the switch
+is then not offered, since off would have nothing to switch back to.
+
 ## Private member session ownership
 
 The section name is retained for existing documentation links. Member memory is
