@@ -462,6 +462,10 @@ _STREAM_HOLDBACK_JWT_MAX = 4096
 # Bearer anchors below, named so the anchors and discard cannot drift apart.
 _JWT_SEGMENT_VALUE_CLASS = r"[A-Za-z0-9_-]"
 _BEARER_VALUE_CLASS = r"[A-Za-z0-9._~+/=-]"
+# Value class of the batch AWS key-value branches in `_CREDENTIAL_PATTERNS`
+# (`aws_secret_access_key=`, `SessionToken:` and the rest): a value ends at
+# whitespace or a JSON structural delimiter.
+_AWS_KEYED_VALUE_CLASS = r"[^\s\"',}]"
 _STREAM_DISCARD_RUN_RES = {
     # Read off the owner at import: the class is baked into the compiled pattern
     # here, so this is a one-shot build input rather than a stored re-export. The
@@ -470,6 +474,7 @@ _STREAM_DISCARD_RUN_RES = {
     "token-param": re.compile(rf"{redaction._TOKEN_PARAM_VALUE_CLASS}*"),
     "jwt": re.compile(rf"(?:{_JWT_SEGMENT_VALUE_CLASS}|\.)*"),
     "bearer": re.compile(rf"{_BEARER_VALUE_CLASS}*"),
+    "aws-keyed": re.compile(rf"{_AWS_KEYED_VALUE_CLASS}*"),
 }
 # Bytes of terminator-less continuation dropped silently between two tags. It is
 # NOT an exit: at the bound the discard re-emits the tag, zeroes the counter and
@@ -531,6 +536,167 @@ _BEARER_ANCHOR_PARTIAL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Trailing (possibly incomplete) AWS key-value pair: a recognised key label
+# (`aws_secret_access_key=`, `"SessionToken": "`, ...) followed by a value still
+# in progress at the buffer tail. The batch branch only redacts the value while
+# its label is in the same `redact()` call, and nothing else catches a value
+# with no long base64 run, so a value longer than `_STREAM_HOLDBACK_MAX` cut at
+# the floor would stream raw. The label is STRONG evidence: hold from its start
+# up to `_STREAM_HOLDBACK_JWT_MAX`, then fail closed. Built from the batch label
+# rules so the two key lists cannot drift apart.
+#
+# The anchor also matches a key whose separator has not arrived yet
+# (`aws_session_token ` before its `=`), since that whitespace is outside
+# _CRED_CLASS too, and a value already closed by its quote while the run after
+# that quote is still credential-class: the natural cut would otherwise walk
+# back over the closing quote into the value and cut it from its label.
+_AWS_LABEL_SEPARATOR_RE = r"[:=]\s*[\"']?"
+
+
+def _aws_key_prefix(label: re.Pattern[str]) -> str:
+    """The key part of a batch AWS label rule, without its separator."""
+    if not label.pattern.endswith(_AWS_LABEL_SEPARATOR_RE):
+        raise RuntimeError(f"AWS label rule changed shape: {label.pattern!r}")
+    return label.pattern[: -len(_AWS_LABEL_SEPARATOR_RE)]
+
+
+_AWS_KEY_QUOTE_RE = r"[\"']?\s*"
+
+
+def _aws_key_name(label: re.Pattern[str]) -> str:
+    """The key name alternation of a batch AWS label rule."""
+    prefix = _aws_key_prefix(label)
+    if not prefix.endswith(_AWS_KEY_QUOTE_RE):
+        raise RuntimeError(f"AWS label rule changed shape: {label.pattern!r}")
+    return prefix[: -len(_AWS_KEY_QUOTE_RE)]
+
+
+_CRED_CLASS_RE = "[" + "".join(re.escape(c) for c in sorted(_CRED_CLASS)) + "]"
+_AWS_KEY_NAMES_RE = (
+    "(?:" + "|".join(_aws_key_name(label) for label, _rule in redaction._AWS_LABEL_RULES) + ")"
+)
+_AWS_KEYED_ANCHOR_PARTIAL_RE = re.compile(
+    _AWS_KEY_NAMES_RE
+    + _AWS_KEY_QUOTE_RE
+    + rf"(?:(?P<sep>[:=])\s*(?P<open>[\"']?)(?P<val>{_AWS_KEYED_VALUE_CLASS}*)"
+    + rf"(?P<close>[\"']{_CRED_CLASS_RE}*)?)?\Z"
+)
+_AWS_KEY_NAME_TAIL_RE = re.compile(_AWS_KEY_NAMES_RE + r"\Z")
+_AWS_LABEL_HEAD_RE = re.compile(_AWS_KEY_NAMES_RE + _AWS_KEY_QUOTE_RE + "[:=]")
+_AWS_NOT_VALUE = frozenset("\"',}")
+_AWS_KEY_NAME_MAX = 64  # longer than every key name; bounds the backward key search
+# After a separator-free key was released past the ceiling: the rest of its label.
+_AWS_PENDING_LABEL_RE = re.compile(r"(\s*[\"']?\s*)([:=])?")
+
+
+def _skip_back(buf: str, pos: int, chars: str, *, space: bool = False, once: bool = False) -> int:
+    """Walk *pos* back over *chars* (and whitespace when *space*), at most once if *once*."""
+    while pos > 0 and (buf[pos - 1] in chars or (space and buf[pos - 1].isspace())):
+        pos -= 1
+        if once:
+            break
+    return pos
+
+
+def _key_ending_at(buf: str, end: int) -> int | None:
+    """Start of an AWS key name that ends exactly at *end*, if one does."""
+    key = _AWS_KEY_NAME_TAIL_RE.search(buf, max(0, end - _AWS_KEY_NAME_MAX), end)
+    return None if key is None else key.start()
+
+
+def _aws_keyed_anchor(buf: str) -> re.Match[str] | None:
+    """The leftmost `_AWS_KEYED_ANCHOR_PARTIAL_RE` match in *buf*, in linear time.
+
+    A plain `search` retries every key occurrence and rescans the value to the
+    end each time: quadratic on a long run of repeated labels, which would stall
+    the event loop that feeds the stream. Every match ends at the buffer end, so
+    its value starts at or after `low`: the start of the value run that ends at
+    the first quote of the trailing credential-class run (a closed value), or at
+    the buffer end. Only three labels can therefore start a match: one whose
+    separator syntax ends at `low`, the first label head at or after `low`, and
+    a separator-free key at the tail. Each is confirmed by one anchored match.
+    """
+    n = len(buf)
+    cut = n
+    while cut > 0 and buf[cut - 1] in _CRED_CLASS:
+        cut -= 1
+    low = next((p for p in range(cut, n) if buf[p] in "\"'"), n)
+    while low > 0 and not (buf[low - 1].isspace() or buf[low - 1] in _AWS_NOT_VALUE):
+        low -= 1
+    starts: list[int] = []
+    sep = _skip_back(buf, _skip_back(buf, low, "\"'", once=True), "", space=True)
+    for sep_end in (sep, low + 1):
+        # The separator ends the label either before the value run (whitespace
+        # or a quote between them) or as the run's first byte, which is a
+        # value-class byte itself (`Key\n:v`).
+        if 0 < sep_end <= n and buf[sep_end - 1] in ":=":
+            key_end = _skip_back(
+                buf, _skip_back(buf, sep_end - 1, "", space=True), "\"'", once=True
+            )
+            if (start := _key_ending_at(buf, key_end)) is not None:
+                starts.append(start)
+    bare_end = _skip_back(buf, _skip_back(buf, n, "", space=True), "\"'", once=True)
+    if (start := _key_ending_at(buf, bare_end)) is not None:
+        starts.append(start)
+    if (head := _AWS_LABEL_HEAD_RE.search(buf, low)) is not None:
+        starts.append(head.start())
+    for start in sorted(starts):
+        if (match := _AWS_KEYED_ANCHOR_PARTIAL_RE.match(buf, start)) is not None:
+            return match
+    return None
+
+
+# A discard armed on an AWS label before its value starts walks the rest of the
+# label grammar first: "aws-key" still expects `["']?\s*[:=]`, "aws-sep" still
+# expects `\s*["']?`, and only then "aws-keyed" drops value bytes. Without these
+# states a label padded past the ceiling would arm a value discard that its own
+# opening quote ends, and the value after that quote would stream raw.
+_AWS_KEY_REST_RE = re.compile(r"[\"']?\s*")
+_AWS_SEP_REST_RE = re.compile(r"\s*")
+
+
+def _aws_discard_state(anchor: re.Match[str]) -> str:
+    """The discard kind for an AWS label whose material reaches the buffer end."""
+    if anchor.group("sep") is None:
+        return "aws-key"
+    if not anchor.group("val") and not anchor.group("open"):
+        return "aws-sep"
+    return "aws-keyed"
+
+
+def _run_end(pattern: re.Pattern[str], text: str, pos: int) -> int:
+    """End of *pattern*'s match at *pos*; every discard pattern can match empty."""
+    match = pattern.match(text, pos)
+    assert match is not None
+    return match.end()
+
+
+def _discard_run_one(kind: str, text: str) -> tuple[int, str]:
+    """How much of *text* one discard kind consumes, and its kind afterwards."""
+    pos = 0
+    if kind == "aws-key":
+        pos = _run_end(_AWS_KEY_REST_RE, text, pos)
+        if pos == len(text) or text[pos] not in ":=":
+            return pos, kind
+        pos, kind = pos + 1, "aws-sep"
+    if kind == "aws-sep":
+        pos = _run_end(_AWS_SEP_REST_RE, text, pos)
+        if pos == len(text):
+            return pos, kind
+        pos, kind = pos + (text[pos] in "\"'"), "aws-keyed"
+    return _run_end(_STREAM_DISCARD_RUN_RES[kind], text, pos), kind
+
+
+def _discard_run(kinds: tuple[str, ...], text: str) -> tuple[int, tuple[str, ...]]:
+    """The longest run any armed kind consumes, and the kinds still inside it.
+
+    Nested carriers (a `?token=` inside an AWS value) each end at their own
+    terminator; dropping until the LAST of them ends keeps the outer value hidden.
+    """
+    results = [_discard_run_one(kind, text) for kind in kinds]
+    run = max(r for r, _kind in results)
+    return run, tuple(dict.fromkeys(k for r, k in results if r == run))
+
 
 def _complete_token_match_crossing(
     matches: tuple[re.Match[str], ...], cut: int
@@ -556,15 +722,16 @@ class StreamRedactor:
     character, while a credential is a contiguous credential-class run.
     """
 
-    __slots__ = ("_buf", "_redact", "_discarding", "_discard_kind", "_discarded")
+    __slots__ = ("_buf", "_redact", "_discarding", "_discard_kind", "_discarded", "_aws_pending")
 
     def __init__(self, redactor: "Callable[[str], str] | None" = None) -> None:
         self._buf = ""
         # Resolve at call time so module-load order is irrelevant.
         self._redact = redactor or redact
         self._discarding = False
-        self._discard_kind: str | None = None
+        self._discard_kind: tuple[str, ...] | None = None
         self._discarded = 0
+        self._aws_pending = False
 
     def _redact_window(self, text: str) -> str:
         """Redact one context-incomplete window without URL-prefix exemptions."""
@@ -593,12 +760,11 @@ class StreamRedactor:
         # to Phase A as an anchorless run, which the 512 floor streams raw.
         if self._discarding:
             assert self._discard_kind is not None
-            run_match = _STREAM_DISCARD_RUN_RES[self._discard_kind].match(self._buf)
-            assert run_match is not None
-            run = run_match.end()
+            run, kinds = _discard_run(self._discard_kind, self._buf)
             self._discarded += run
             if run == len(self._buf):
                 self._buf = ""
+                self._discard_kind = kinds
                 if self._discarded < _STREAM_DISCARD_MAX:
                     return ""
                 self._discarded = 0
@@ -606,6 +772,23 @@ class StreamRedactor:
             self._discarding = False
             self._discard_kind = None
             self._buf = self._buf[run:]
+
+        # A separator-free AWS key padded past the ceiling was released as the
+        # plain text it still is. If its separator arrives now, the value after
+        # it is a credential whose label is already gone: tag it and drop it.
+        if self._aws_pending:
+            pending = _AWS_PENDING_LABEL_RE.match(self._buf)
+            assert pending is not None
+            if pending.group(2) is not None:
+                head, rest = self._buf[: pending.end()], self._buf[pending.end() :]
+                self._aws_pending = False
+                self._buf, self._discarding = "", True
+                self._discard_kind, self._discarded = ("aws-sep",), 0
+                return head + _redaction._REDACTED_CREDENTIAL_TAG + self.feed(rest)
+            if pending.end() == len(self._buf):
+                head, self._buf = self._buf, ""
+                return head
+            self._aws_pending = False
 
         # PHASE A -- SAFETY CUT.
         # Invariant: every candidate can only move the cut backward. Bytes before
@@ -649,6 +832,13 @@ class StreamRedactor:
         if bearer_anchor is not None:
             safety_cuts.append(bearer_anchor.start())
 
+        # AWS key-value labels are STRONG for the same reason: the label's
+        # separator whitespace is outside _CRED_CLASS, and the value is only
+        # redacted while its label reaches the same batch call.
+        aws_keyed_anchor = _aws_keyed_anchor(self._buf)
+        if aws_keyed_anchor is not None:
+            safety_cuts.append(aws_keyed_anchor.start())
+
         # A token-name prefix without '=' is WEAK. It still needs a short
         # holdback so a chunk boundary cannot split the name, but it is not yet a
         # credential and must never escalate the cap or authorize data loss.
@@ -673,6 +863,7 @@ class StreamRedactor:
         strong_anchored = (
             partial_jwt is not None
             or bearer_anchor is not None
+            or aws_keyed_anchor is not None
             or complete_token_crossing is not None
             or strong_token_anchor
         )
@@ -699,45 +890,54 @@ class StreamRedactor:
                 # name prefix (`&tok`, no `=`) is held by the safety cut but is
                 # not yet a credential: it authorizes no drop and names no value
                 # class to drop with.
-                credential_reaches_end = (
-                    partial_jwt is not None
-                    or bearer_anchor is not None
-                    or strong_token_anchor
-                    or (
-                        complete_token_crossing is not None
-                        and complete_token_crossing.end(1) == len(self._buf)
-                    )
+                # Every carrier whose material reaches the buffer end arms its
+                # own kind: a STRONG token anchor or a complete crossing ending
+                # the buffer -> "token-param"; a Bearer anchor -> "bearer"; an
+                # AWS label whose value is not closed yet -> its label-grammar
+                # state; a partial JWT -> "jwt". Carriers can nest (a JWT in a
+                # token value, a `?token=` in an AWS value), so all of them
+                # stay armed and the discard ends only where the last one does.
+                token_param_reaches_end = strong_token_anchor or (
+                    complete_token_crossing is not None
+                    and complete_token_crossing.end(1) == len(self._buf)
                 )
+                aws_closed = aws_keyed_anchor is not None and (
+                    aws_keyed_anchor.group("close") is not None
+                )
+                armed: list[str] = []
+                if token_param_reaches_end:
+                    armed.append("token-param")
+                if bearer_anchor is not None:
+                    armed.append("bearer")
+                if aws_keyed_anchor is not None and not aws_closed:
+                    armed.append(_aws_discard_state(aws_keyed_anchor))
+                if partial_jwt is not None:
+                    armed.append("jwt")
+                if armed == ["aws-key"]:
+                    # A key name with no separator yet is not a credential. Release
+                    # it and its padding unchanged, and remember the label is open.
+                    out, self._buf = self._redact_window(self._buf), ""
+                    self._aws_pending = True
+                    return out
+                credential_reaches_end = bool(armed)
                 self._discarding = credential_reaches_end
-                self._discard_kind = None
-                if credential_reaches_end:
-                    # Every arming term above maps to exactly one kind, carrier
-                    # first: a STRONG token anchor or a complete crossing ending
-                    # the buffer -> "token-param"; a Bearer anchor -> "bearer";
-                    # a partial JWT -> "jwt". No other term can arm, so the
-                    # final `else` holds a true invariant.
-                    # Prefer an enclosing carrier over a token shape inside its
-                    # value: its value class defines where that credential ends.
-                    token_param_reaches_end = strong_token_anchor or (
-                        complete_token_crossing is not None
-                        and complete_token_crossing.end(1) == len(self._buf)
-                    )
-                    if token_param_reaches_end:
-                        self._discard_kind = "token-param"
-                    elif bearer_anchor is not None:
-                        self._discard_kind = "bearer"
-                    else:
-                        assert partial_jwt is not None
-                        self._discard_kind = "jwt"
+                self._discard_kind = tuple(armed) if armed else None
                 self._discarded = 0
                 # A complete value may cross the safety cut yet end before a
                 # benign suffix in the same buffer. Drop only through the value;
                 # the suffix remains buffered for normal processing. Sticky
                 # discard is reserved for credential material that reaches the
-                # buffer end, where a continuation can still arrive.
+                # buffer end, where a continuation can still arrive. An AWS
+                # value its quote has closed is such a complete value.
                 drop_end = len(self._buf)
-                if complete_token_crossing is not None and not credential_reaches_end:
-                    drop_end = complete_token_crossing.end(1)
+                if not credential_reaches_end:
+                    ends = []
+                    if complete_token_crossing is not None:
+                        ends.append(complete_token_crossing.end(1))
+                    if aws_closed:
+                        assert aws_keyed_anchor is not None
+                        ends.append(aws_keyed_anchor.start("close") + 1)
+                    drop_end = max(ends)
                 commit, self._buf = self._buf[:i], self._buf[drop_end:]
                 out = self._redact_window(commit) if commit else ""
                 return out + _redaction._REDACTED_CREDENTIAL_TAG
@@ -767,6 +967,7 @@ class StreamRedactor:
 
     def flush(self) -> str:
         """Redact and return the buffered remainder; clears the buffer."""
+        self._aws_pending = False
         if self._discarding:
             self._buf = ""
             self._discarding = False
@@ -792,6 +993,7 @@ class StreamRedactor:
         self._discarding = False
         self._discard_kind = None
         self._discarded = 0
+        self._aws_pending = False
 
 
 def _deny_segment_views(segment: str, emit_self: bool = True) -> tuple[str, ...]:
