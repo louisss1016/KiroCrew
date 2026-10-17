@@ -17,6 +17,7 @@ from kiro_crew.agent_files import (
 from kiro_crew.agent_files import GUEST_AGENT_FILENAME as _GUEST_AGENT_FILENAME
 from kiro_crew.agent_files import KNOWLEDGE_AGENT_FILENAME as _KNOWLEDGE_AGENT_FILENAME
 from kiro_crew.agent_files import LITE_AGENT_FILENAME as _LITE_AGENT_FILENAME
+from kiro_crew.agent_files import MATE_CONDUCTOR_AGENT_FILENAME as _MATE_CONDUCTOR_AGENT_FILENAME
 from kiro_crew.agent_files import RESEARCH_AGENT_FILENAME as _RESEARCH_AGENT_FILENAME
 from kiro_crew.agent_files import TEAM_LEAD_AGENT_FILENAME as _TEAM_LEAD_AGENT_FILENAME
 from kiro_crew.agent_materialization import auto_approve, managed_mcp, skill_resources
@@ -50,6 +51,39 @@ def _install_guest_agent() -> None:
     auto_approve.write_governed_spec(
         guest_path, guest_config, source="_install_guest_agent", kas_policy="none"
     )
+
+
+def _install_mate_conductor_agent() -> None:
+    """Generate and install the ``kirocrew-mate-conductor`` agent config.
+
+    The agent a crewmate's own chat runs on. Derived from the default template
+    (``build_agent_config()``) exactly like ``kirocrew-research`` and
+    ``kirocrew-team-lead`` below, so its prompt, tools and ``mcpServers`` are
+    byte-identical to ``kirocrew.json`` today -- only ``name`` and
+    ``description`` differ. This is migration step 1 of
+    ``rfc-mate-owned-agent-config.md``: a pure sourcing move. It intentionally
+    keeps the guide and member platform servers (unlike
+    :func:`_without_guide_server`'s background agents) because a crewmate IS
+    the thing those servers serve.
+
+    Step 1 does not read or write ``~/.kiro/mates/agents/`` and does not add a
+    worker to delegate to (steps 2 and 3); the conductor runs the full default
+    governance ceiling exactly as a crewmate does today.
+    """
+    config = agent_mod.build_agent_config()
+    config["name"] = "kirocrew-mate-conductor"
+    config["description"] = "The agent a crewmate's own chat runs on."
+    agent_mod.kiro_agents_dir_path().mkdir(parents=True, exist_ok=True)
+    path = agent_mod.kiro_agents_dir_path() / _MATE_CONDUCTOR_AGENT_FILENAME
+    # ``build_agent_config`` carries the operator's ``agent.json`` block -- the same
+    # one a crewmate on ``kirocrew.json`` runs under today -- so keep its ``deny``/``ask``
+    # rules and derive the allows, exactly as ``_install_research_agent`` does. The
+    # default ``"derive"`` would replace the operator's KAS deny/ask with allows
+    # derived from ``allowedTools``, silently loosening the crewmate's own ceiling.
+    auto_approve.write_governed_spec(
+        path, config, source="_install_mate_conductor_agent", kas_policy="inherit_narrowing"
+    )
+    agent_mod.logger.info("Installed mate conductor agent config: %s", path)
 
 
 def _install_lite_agent_fallback() -> None:

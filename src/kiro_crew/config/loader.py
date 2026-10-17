@@ -46,6 +46,9 @@ from kiro_crew import (
     platform_compat,
     windows_acl,
 )
+
+# Leaf module (no kiro_crew imports) — no import cycle with config.
+from kiro_crew.agent_files import is_kirocrew_default_agent as _is_kirocrew_default_agent
 from kiro_crew.agent_sdk.backends import (
     ACP_BACKENDS_EFFORT_FROM_ADVERTISED_OPTION,
     resolve_cc_permission_mode,
@@ -4895,7 +4898,7 @@ class KiroCrewConfig:
         candidates: list[tuple[str, str]] = []
         if model_override:
             candidates.append((model_override, "model_override"))
-        if agent and agent != "kirocrew":
+        if agent and not _is_kirocrew_default_agent(agent):
             candidates.append((self._resolve_named_agent_model(agent), f"agent spec {agent}"))
         candidates.append((global_model, "agent.model"))
         # A pin says WHAT was picked, never for WHICH harness, so a backend switch
@@ -7075,7 +7078,7 @@ def _dangling_template(kiro_agent: object, names: frozenset[str]) -> str | None:
     """
     bound = kiro_agent if isinstance(kiro_agent, str) else ""
     template = dispatch_kiro_agent(bound) or "kirocrew"
-    if template == "kirocrew" or template in names:
+    if _is_kirocrew_default_agent(template) or template in names:
         return None
     return template
 
@@ -7995,7 +7998,7 @@ def _agent_tier_model(
     )
     if in_scope(model_pin):
         return model_pin
-    if kiro_agent and kiro_agent != "kirocrew":
+    if kiro_agent and not _is_kirocrew_default_agent(kiro_agent):
         pinned = normalize_agent_model(config._resolve_named_agent_model(kiro_agent))
         if in_scope(pinned):
             return pinned
@@ -8027,7 +8030,7 @@ def resolve_app_spawn_model(config: KiroCrewConfig, app_name: str, agent_name: s
     app_pin = in_scope(app_model_pin(config, app_name))
     if not app_pin:
         return ""
-    if agent_name and agent_name != "kirocrew":
+    if agent_name and not _is_kirocrew_default_agent(agent_name):
         if in_scope(normalize_agent_model(config._resolve_named_agent_model(agent_name))):
             return ""
     return app_pin

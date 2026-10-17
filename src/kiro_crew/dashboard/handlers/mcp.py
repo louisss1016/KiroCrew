@@ -1336,7 +1336,9 @@ async def api_mcp_active(request: web.Request) -> web.Response:
     # Non-kirocrew agent: read from agent config. The lookup walks the agents
     # directory and reads specs until the name matches, so it runs in a thread:
     # a large directory must not stall every other request on the loop.
-    if agent and agent != "kirocrew":
+    from kiro_crew.agent_files import is_kirocrew_default_agent
+
+    if agent and not is_kirocrew_default_agent(agent):
         agent_mcps = await asyncio.to_thread(_agent_mcp_server_names, agent)
         if agent_mcps is None:
             return web.json_response([])

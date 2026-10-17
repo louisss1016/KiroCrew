@@ -36,6 +36,13 @@ PIPELINE_CONDUCTOR_AGENT_FILENAME = "kirocrew-pipeline-conductor.json"
 LEDGER_CONDUCTOR_AGENT_FILENAME = "kirocrew-ledger-conductor.json"
 SECURITY_CONDUCTOR_AGENT_FILENAME = "kirocrew-security-conductor.json"
 WORKER_AGENT_FILENAME = "kirocrew-worker.json"
+# The mate conductor: the agent a crewmate's own chat runs on. Derived from the
+# default template (same prompt, tools and mcpServers), so today it is behaviour-
+# identical to `kirocrew.json` -- only its definition now has its own name in
+# source rather than being an alias for the shared default. See
+# docs/request-for-change/rfc-mate-owned-agent-config.md, migration step 1: this
+# spec intentionally does not yet read or write `~/.kiro/mates/agents/` (step 3).
+MATE_CONDUCTOR_AGENT_FILENAME = "kirocrew-mate-conductor.json"
 # The dashboard-author crewmate: authors ONE dashboard template and lands it as a
 # pull request, writing no runtime code. Its own file because it is a dispatched,
 # worker-shaped agent with its own charter and tool surface -- it writes files and
@@ -75,6 +82,41 @@ ASSISTANT_MEMBER_NAME = "mate"
 ASSISTANT_DEFAULT_DISPLAY_NAME = "Mate"
 
 
+#: Agent names a chat session treats as "the kirocrew default" for context
+#: assembly, never as a hand-written custom agent. ``context_assembly`` guards
+#: workspace identity, the docs pointer and steering re-injection behind an
+#: ``is_custom`` check whose question is "did a user replace the default
+#: agent", so it is keyed on NAME EQUALITY to ``AGENT_FILENAME``'s stem
+#: (``"kirocrew"``) rather than on content. A mate's own chat runs on
+#: ``kirocrew-mate-conductor`` -- a Crew-owned spec byte-identical to the
+#: default template, not a user's custom agent -- so it belongs in this set:
+#: without it, a crewmate's chat loses its workspace identity block and docs
+#: pointer purely because its spec has its own filename. The existing
+#: ``kirocrew-research``/``kirocrew-worker``/``kirocrew-team-lead`` service and
+#: dispatch specs do NOT join this set: those are backend loops this change
+#: does not touch, and widening their classification is a separate decision.
+KIROCREW_DEFAULT_AGENT_NAMES = frozenset(
+    {
+        AGENT_FILENAME[: -len(".json")],
+        "kirocrew-mate-conductor",
+    }
+)
+
+
+def is_kirocrew_default_agent(agent: object) -> bool:
+    """Whether *agent* is one of :data:`KIROCREW_DEFAULT_AGENT_NAMES`.
+
+    The single predicate every reader that decides "is this the Crew default
+    agent?" by NAME must call instead of repeating the name-equality literal --
+    the ``is_custom`` checks in ``context.py`` and ``context_assembly/``, the
+    skill-scope resolution in ``agent_discovery.py`` and ``acp/skill_projection.py``,
+    the model-pin tiers in ``config/loader.py`` and ``session_parts/policy.py``,
+    the KAS install in ``service_agents.py``, and the template resolvers. A future
+    name joining the set is then a one-line change here, not a hunt across sites.
+    """
+    return agent in KIROCREW_DEFAULT_AGENT_NAMES
+
+
 def is_assistant_member(name: object, entry: object) -> bool:
     """True when *name* is the first crewmate's key. *entry* is not consulted.
 
@@ -99,6 +141,7 @@ OWNED_KIRO_AGENT_FILES = (
     LEDGER_CONDUCTOR_AGENT_FILENAME,
     SECURITY_CONDUCTOR_AGENT_FILENAME,
     WORKER_AGENT_FILENAME,
+    MATE_CONDUCTOR_AGENT_FILENAME,
     DASHBOARD_AUTHOR_AGENT_FILENAME,
     KNOWLEDGE_AGENT_FILENAME,
     RESEARCH_AGENT_FILENAME,

@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Protocol
 
+from kiro_crew.agent_files import is_kirocrew_default_agent as _is_kirocrew_default_agent
 from kiro_crew.agent_sdk.backends import (
     ACP_BACKENDS_ACP_RUNTIME,
     ACP_BACKENDS_SESSION_EVICTION,
@@ -401,7 +402,7 @@ def _session_model(
         agent = crew.kiro_agent or agent
 
     per_agent_model = ""
-    if agent and agent != "kirocrew":
+    if agent and not _is_kirocrew_default_agent(agent):
         per_agent_model = cfg._resolve_named_agent_model(agent)
     return _model_fallback(per_agent_model, cfg.agent.model)
 

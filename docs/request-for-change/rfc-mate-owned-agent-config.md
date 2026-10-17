@@ -1,12 +1,12 @@
 ---
 title: Mate-owned agent config — a copied custom agent in its own folder
-status: draft
+status: in-progress
 author: gjjnn
 created: 2026-10-16
 last-audited: 2026-10-16
 audited-at: 0600e2804476
 doc-pr:
-implementation-prs: []
+implementation-prs: [21463]
 tracking-issues: []
 supersedes: []
 superseded-by: []
