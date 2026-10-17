@@ -89,6 +89,9 @@ const SORT_OPTIONS: { value: SortKey }[] = [
   { value: 'created-asc' },
   { value: 'name-asc' },
   { value: 'name-desc' },
+  // The person's own drag order, under Name. A drop between two rows in any
+  // sort switches to it, so it is checked whenever the list is in that order.
+  { value: 'manual' },
 ]
 /** Catalog key per sort option — same resolvable shape as `FILTER_LABEL_KEY`. */
 export const SORT_LABEL_KEY: Record<SortKey, string> = {
@@ -98,6 +101,7 @@ export const SORT_LABEL_KEY: Record<SortKey, string> = {
   'created-asc': 'pages.chatSidebar.sort_created_oldest',
   'name-asc': 'pages.chatSidebar.sort_name_asc',
   'name-desc': 'pages.chatSidebar.sort_name_desc',
+  manual: 'pages.chatSidebar.sort_manual',
 }
 /** Catalog key per folder sort mode -- the "Folder order" rows in the same menu.
  *  Three rows because there are three modes; the list itself is
@@ -152,10 +156,10 @@ export function renderSearchDock(shell: SidebarScope): { field: React.ReactNode;
     folderFilterRows, folderOfflineNotice, folderReorderHint, folderReorderHintRef, folderRowsDrawn, folderSortMode,
     folderSortMut, folderSortRead, folders, foldersError, foldersFailed, foldersShelved,
     hasRemoteExecutedRow, hiddenFilters, hiddenFolderCount, instanceSessions, isMobile, lane,
-    laneSwitchLabel, listNarrowed, modelFilterInverted, modelFilterRows, newChatError, nextLane, pinnedOrderError,
+    laneSwitchLabel, listNarrowed, manualOrderError, modelFilterInverted, modelFilterRows, newChatError, nextLane, pinnedOrderError,
     recentAmountDraft, recentUnitDraft, recentWindowMs, refetchColumns, refetchFolders, remoteSessionsError,
     renameError, seedError, seedStateLanesMutation, selectRecentPreset, setAllFiltersPaused,
-    setAutoTitleError, setFilterSortOpen, setFolderActionError, setFolderOfflineNotice, setModelFilterExcluded, setNewChatError,
+    setAutoTitleError, setFilterSortOpen, setFolderActionError, setFolderOfflineNotice, setManualOrderError, setModelFilterExcluded, setNewChatError,
     setPinnedOrderError, setRecentAmountDraft, setRenameError, setSeedError, setSlotFilter, setSortKey, setStaleCollapseMs,
     setToggleSaveFailed, showAllFolders, slotFilter, sortError, sortKey, staleCollapseMs, tagFilterRows, toggleFilter,
     toggleFolderFilter, toggleFoldersShelved, toggleHideFilter, toggleModelFilter, toggleSaveFailed,
@@ -1166,6 +1170,17 @@ export function renderSearchDock(shell: SidebarScope): { field: React.ReactNode;
         onDismiss={() => setPinnedOrderError('')}
         className="mx-2 mt-2 shrink-0"
         testId="pinned-order-error"
+      />
+      {/* The manual order's twin of the notice above, laid out the same way. */}
+      <ErrorNotice
+        title={i18nT('pages.chatSidebar.manual_order_save_failed')}
+        message={manualOrderError}
+        messagePlacement="below"
+        askAgent
+        actionPlacement="below"
+        onDismiss={() => setManualOrderError('')}
+        className="mx-2 mt-2 shrink-0"
+        testId="manual-order-error"
       />
       <ErrorNotice
         message={newChatError}

@@ -3355,12 +3355,16 @@ async def load_pinned_order_after_listen(state: DashboardState) -> None:
 
     Kept off the boot path (``no-new-work-on-gateway-boot-path``): until it
     lands, slot rows carry no ``pin_rank`` and pinned sessions show in the
-    sidebar's own sort for a moment.
+    sidebar's own sort for a moment. The manual order, kept in the same store,
+    is read next, on its own terms (``chat_manual_order``).
     """
+    from kiro_crew.dashboard.chat_manual_order import load_manual_order_after_listen
+
     try:
         await ensure_pinned_order_loaded(state)
     except Exception:  # noqa: BLE001 -- a display preference must not crash startup
         logger.warning("could not load the pinned session order", exc_info=True)
+    await load_manual_order_after_listen(state)
 
 
 async def _write_pinned_order(
