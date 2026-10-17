@@ -58,7 +58,7 @@ leaves the pin alone; `""` or `auto` stores `""` (inherit), through
 `normalize_agent_model`. An update publishes only the fields it was given
 (`persist_member_config(changed_fields=...)`), so a concurrent edit to another
 field survives. The value is judged on shape (`validation._MODEL_NAME_RE`, as
-`cron add --model` is), then, unless the provider is `claude_code`, refused
+the cron job `--model` flag is), then, unless the provider is `claude_code`, refused
 when `model_registry.acp_id_correction` maps it to another served id or it is
 a display-only canonical key, the two checks the crew editor's
 `_model_pin_rejected` runs before entitlement. Entitlement needs a live
