@@ -366,7 +366,17 @@ def _url_payload_command(n: int) -> str:
 #: Raised again, from 29,573, for the one ``pinned-order`` entry in
 #: ``paths._CREW_SECRET_LEAVES``: the person's pinned-session order is fenced from
 #: agent file tools like ``tag-grants`` beside it.
-_PACKAGE_LINE_BUDGET = 29_574
+#:
+#: Raised again, from 29,574, for ``argv_row_floor.py``: one table that reads the
+#: command-literal deny rows (``terraform destroy.*``, ``git reset --hard.*``,
+#: ``dd if=.*`` and five more) off the argv so an option between the program and
+#: the anchored word cannot re-spell them, plus its hook in the evaluator. It reuses
+#: the shell reader to split commands and words (quotes, glued operators, subshells,
+#: redirections, nested payloads), resolves the program past shell keyword openers
+#: and the shared ``_PROGRAM_RUNNERS`` wrappers, folds line continuations and reads
+#: redirections quote-aware, resolves compound-opener conditions, and matches the
+#: program against the row. It only ADDS refusals; no row, pattern or pass moved.
+_PACKAGE_LINE_BUDGET = 30_033
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second

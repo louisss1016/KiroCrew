@@ -1465,6 +1465,21 @@ def is_denied(
     pattern_denial = _deny_pattern_passes(tool_name, lower, all_patterns, _reason)
     if pattern_denial is not None:
         return pattern_denial
+    # ── Command-literal rows read off the argv (``argv_row_floor``) ──
+    # Rows like ``terraform destroy.*`` name one spelling; the floor reads the argv
+    # so an option between the program and the anchored word cannot re-spell it.
+    # A UNION after the regex tier (a literal hit keeps its refusal), checked only
+    # for rows still in the effective set, so an opt-out disables both.
+    row_floor = _submodule("argv_row_floor")
+    row_pattern = row_floor.argv_row_denial(lower, regex_patterns)
+    if row_pattern is not None:
+        _emit_deny_event(tool_name, row_pattern, lower)
+        return _reason(
+            row_pattern,
+            row_floor.ARGV_ROW_FLOOR_NOTE,
+            rule=_rules._RULE_ID_BY_PATTERN.get(row_pattern, ""),
+            component="argv-floor",
+        )
     # All windows cleared the deny passes — the input is allowed.  If it was a
     # feature-branch push, emit the deferred allow audit now (final outcome).
     #
