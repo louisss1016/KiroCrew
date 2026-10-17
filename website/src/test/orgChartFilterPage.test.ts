@@ -231,6 +231,36 @@ describe('org-chart: the Open / Closed / All filter', () => {
     expect(again.getAttribute('aria-expanded')).toBe('false')
   })
 
+  it('keeps the numbers beside the rows honest under a filter', () => {
+    mount(crew())
+    pick('open').click()
+    const g = graphText()
+    // lead: 4 dispatched, but a, b (context) and e (context) are drawn under Open.
+    expect(g).toContain('3 of 4 dispatched')
+    // the board footer counts the boards drawn: 1 lead + 2 sub-leads.
+    expect(document.querySelector('[data-dashboard-field="items"]')!.textContent).toBe('3')
+    pick('all').click()
+    expect(graphText()).not.toContain(' of 4 dispatched')
+    expect(document.querySelector('[data-dashboard-field="items"]')!.textContent).toBe('5')
+  })
+
+  it('says in words, with a dashed chip, which kept rows are there only for context', () => {
+    mount(crew())
+    pick('open').click()
+    const ctx = Array.from(document.querySelectorAll('#oc-graph .oc-chip.oc-ctx'))
+    // b and e do not match Open themselves; a, d and g do.
+    expect(ctx).toHaveLength(2)
+    for (const c of ctx) expect(c.textContent).toContain('shown for the tasks under it')
+    pick('all').click()
+    expect(document.querySelectorAll('#oc-graph .oc-ctx')).toHaveLength(0)
+    expect(graphText()).not.toContain('shown for the tasks under it')
+  })
+
+  it('puts a visible word before the pills, so the control says what it filters', () => {
+    mount(crew())
+    expect(document.querySelector('.oc-flabel')!.textContent).toBe('Tasks:')
+  })
+
   it('names the choices in Simplified Chinese', () => {
     mount(crew(), 'zh-CN')
     expect(pick('open').textContent).toBe('\u8fdb\u884c\u4e2d3')
