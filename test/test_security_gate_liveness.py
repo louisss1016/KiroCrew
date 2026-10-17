@@ -366,7 +366,12 @@ def _url_payload_command(n: int) -> str:
 #: Raised again, from 29,573, for the one ``pinned-order`` entry in
 #: ``paths._CREW_SECRET_LEAVES``: the person's pinned-session order is fenced from
 #: agent file tools like ``tag-grants`` beside it.
-_PACKAGE_LINE_BUDGET = 29_574
+#:
+#: Raised again, from 29,574, for ``rm_floor``: the small seatbelt behind the two
+#: recursive-force rm rows (segments from the shared split, words from the shared
+#: ``_shell_tokens``, flags and an exact root/home target) and its gated branch at the
+#: end of ``is_denied``. No pattern moved.
+_PACKAGE_LINE_BUDGET = 29_691
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
