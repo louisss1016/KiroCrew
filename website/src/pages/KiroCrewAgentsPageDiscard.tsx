@@ -124,6 +124,7 @@ export function useCrewDiscardGuard({
   editEffort,
   triggers,
   displayName,
+  goal,
   sessionColor,
   editAvatar,
   capabilityDirty,
@@ -147,6 +148,7 @@ export function useCrewDiscardGuard({
   editEffort: string
   triggers: string
   displayName: string
+  goal: string
   sessionColor: string
   editAvatar: CrewAvatarOverride | null
   capabilityDirty: boolean
@@ -220,6 +222,7 @@ export function useCrewDiscardGuard({
     // over a stored "Ops" persists nothing, so it must not read as an unsaved
     // change — and a hand-edited config holding "  Ops  " must not open dirty.
     if (displayName.trim() !== (editingAgent.display_name || '').trim()) out.add('routing')
+    if (goal !== (editingAgent.goal || '')) out.add('overview')
     if (sessionColor !== (editingAgent.session_color || '')) out.add('routing')
     // Every tier in one comparison: ghost traits normalize through
     // ghostTraitsFrom (flat record, stable key order), an image override through
@@ -268,7 +271,7 @@ export function useCrewDiscardGuard({
     if (schedDraft) out.add('schedules')
     if (capabilityDirty) out.add('capabilities')
     return out
-  }, [editingAgent, kiroAgent, workspace, memoryStore, editModel, editEffort, triggers, displayName, sessionColor, schedDraft, editAvatar, capabilityDirty])
+  }, [editingAgent, kiroAgent, workspace, memoryStore, editModel, editEffort, triggers, displayName, goal, sessionColor, schedDraft, editAvatar, capabilityDirty])
 
   /** Rail-driven pane changes route through here: leaving the schedules pane
    *  while a schedule draft is open asks before destroying the typed work

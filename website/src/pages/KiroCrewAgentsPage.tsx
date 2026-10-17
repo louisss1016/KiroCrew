@@ -60,6 +60,7 @@ import {
   memberMemoryState,
   DisplayNameField,
   displayNameFallback,
+  GoalField,
 } from './KiroCrewAgentsPageFields'
 import {
   type CrewView,
@@ -86,6 +87,7 @@ export {
   displayNameFallback,
   TriggersField,
   SessionColorField,
+  GoalField,
 } from './KiroCrewAgentsPageFields'
 export type { MemberMemoryState } from './KiroCrewAgentsPageFields'
 
@@ -229,6 +231,7 @@ export default function KiroCrewAgentsPage({ embedded }: { embedded?: boolean } 
   const [memoryStore, setMemoryStore] = useState('default')
   const [triggers, setTriggers] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [goal, setGoal] = useState('')
   const [sessionColor, setSessionColor] = useState('')
   const [editModel, setEditModel] = useState(INHERIT_MODEL)
   const [editEffort, setEditEffort] = useState('')
@@ -333,6 +336,7 @@ export default function KiroCrewAgentsPage({ embedded }: { embedded?: boolean } 
     setKiroAgent(a.kiro_agent); setWorkspace(a.workspace); setMemoryStore(a.memory_store)
     setTriggers(a.triggers || '')
     setDisplayName(a.display_name || '')
+    setGoal(a.goal || '')
     setSessionColor(a.session_color || '')
     setEditModel(a.model || INHERIT_MODEL)
     setEditEffort(a.reasoning_effort || '')
@@ -658,6 +662,9 @@ export default function KiroCrewAgentsPage({ embedded }: { embedded?: boolean } 
       // impossible.
       reasoning_effort: editEffort,
       session_color: sessionColor,
+      // Free-text standing objective. '' is a real value (clears the goal), so
+      // sent unconditionally like display_name/session_color above.
+      goal,
     }
     // Three spellings: a draft the user built; `null` when they explicitly RESET
     // (see `avatarReset`); `avatarPassthrough` before `{}` so a record this build
@@ -868,6 +875,7 @@ export default function KiroCrewAgentsPage({ embedded }: { embedded?: boolean } 
     editEffort,
     triggers,
     displayName,
+    goal,
     sessionColor,
     editAvatar,
     capabilityDirty,
@@ -1050,6 +1058,7 @@ export default function KiroCrewAgentsPage({ embedded }: { embedded?: boolean } 
                         routing (the UX lane's finding on this PR). The create
                         form keeps its copy beside Name for the same reason. */}
                     <DisplayNameField value={displayName} onChange={setDisplayName} fallback={displayNameFallback(editingAgent, editing)} />
+                    <GoalField value={goal} onChange={setGoal} />
                     <CrewOverviewPane
                       // The largest face in the editor opens the builder too, so
                       // the hub does not teach the opposite lesson from the

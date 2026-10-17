@@ -28,6 +28,12 @@ export interface KiroCrewAgent {
    *  payloads predate the field. */
   display_name?: string
   description: string
+  /** The crew's standing objective: free-text, multi-line, authored in the crew
+   *  editor. Distinct from `description` (a one-line summary) and from the
+   *  in-flight goals the Profile card's Goals tab reads from session ledgers.
+   *  Empty or absent means no standing goal is set. Optional: older payloads
+   *  predate the field. */
+  goal?: string
   /** Free-text routing intent read by the orchestrator's select_crew. Optional:
    *  older payloads predate the field, and it falls back to `description`. */
   triggers?: string

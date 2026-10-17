@@ -426,6 +426,28 @@ export function displayNameFallback(agent: KiroCrewAgent | null | undefined, key
   return isAssistantMember(agent) ? i18nT('components.assistantWelcome.default_name') : key
 }
 
+/** The crew's standing-goal input: a multi-line, free-text statement of what
+ *  the crewmate is working toward over time. Rendered in the editor's overview
+ *  ("who it is") pane beside name and description. Distinct from the read-only
+ *  in-flight goals the Profile card's Goals tab reads from session ledgers:
+ *  this is the authored, durable objective, persisted on the crew record. */
+export function GoalField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const label = i18nT('pages.kiroCrewAgentsPage.goal')
+  return (
+    <Field label={label} hint={i18nT('pages.kiroCrewAgentsPage.goal_hint')}>
+      <textarea
+        className="block w-full rounded border border-border bg-bg p-2 text-[13px]"
+        rows={4}
+        placeholder={i18nT('pages.kiroCrewAgentsPage.goal_placeholder')}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        aria-label={label}
+        data-testid="goal-input"
+      />
+    </Field>
+  )
+}
+
 /** The routing-keyword input. Rendered by the create form and by the editor's
  *  routing pane, so it is a component rather than two copies. */
 export function TriggersField({ value, onChange, subject }: { value: string; onChange: (v: string) => void; subject: FormSubject }) {

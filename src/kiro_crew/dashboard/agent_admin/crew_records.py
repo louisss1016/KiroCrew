@@ -443,6 +443,7 @@ async def _api_kirocrew_agents_create(request: web.Request) -> web.Response:
             reasoning_effort=reasoning_effort,
             display_name=display_name,
             description=body.get("description", ""),
+            goal=body.get("goal", ""),
             triggers=body.get("triggers", ""),
             source=body.get("source", "kirocrew"),
             session_color=session_color,

@@ -283,6 +283,18 @@ class KiroCrewAgentConfig:
         default="",
         metadata=_meta("Description", "Human-readable agent description."),
     )
+    goal: str = field(
+        default="",
+        metadata=_meta(
+            "Goal",
+            "The crew's standing objective: a free-text, multi-line statement of "
+            "what this crewmate is working toward over time. Distinct from "
+            "description (a one-line 'what it looks after') and from the in-flight "
+            "goals the Profile card's Goals tab reads from session ledgers. "
+            "Authored and edited from the crew editor; empty means no standing "
+            "goal is set.",
+        ),
+    )
     triggers: str = field(
         default="",
         metadata=_meta(

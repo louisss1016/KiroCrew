@@ -600,6 +600,7 @@ describe('crew editor — save', () => {
       model: 'claude-opus-5',
       reasoning_effort: '',
       session_color: '',
+      goal: '',
       avatar: {},
     })
   })

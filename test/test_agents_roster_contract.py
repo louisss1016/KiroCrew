@@ -52,6 +52,7 @@ ROSTER_ROW_KEYS = frozenset(
         "reasoning_effort",
         "display_name",
         "description",
+        "goal",
         "triggers",
         "source",
         "session_color",
@@ -113,6 +114,7 @@ def _seed_config_with_every_field_set() -> dict:
                 "model": "claude-opus-5",
                 "reasoning_effort": "high",
                 "description": "probe description",
+                "goal": "probe goal",
                 "triggers": "probe triggers",
                 "source": "kirocrew",
                 "session_color": "#abcdef",
@@ -324,6 +326,7 @@ class TestUnshowableValuesAreMasked:
             session_color=self.PROBE,
             display_name=f"label {self.PROBE}",
             description=f"see {self.PROBE}",
+            goal=f"goal: {self.PROBE}",
             source=self.PROBE,
         )
 

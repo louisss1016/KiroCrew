@@ -187,6 +187,7 @@ _AGENT_UNTRUSTED_TEXT_FIELDS = (
     "member_id",
     "display_name",
     "description",
+    "goal",
     "triggers",
     "kiro_agent",
     "workspace",

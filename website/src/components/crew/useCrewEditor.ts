@@ -90,6 +90,7 @@ interface AgentUpdatePayload {
   model: string
   reasoning_effort: string
   session_color: string
+  goal: string
   avatar: CrewAvatarOverride | Record<string, unknown> | null
 }
 
@@ -167,6 +168,8 @@ export interface CrewEditorController {
   setTriggers: (v: string) => void
   displayName: string
   setDisplayName: (v: string) => void
+  goal: string
+  setGoal: (v: string) => void
   sessionColor: string
   setSessionColor: (v: string) => void
   editModel: string
@@ -395,6 +398,7 @@ export function useCrewEditor(args: UseCrewEditorArgs): CrewEditorController {
   const [memoryStore, setMemoryStore] = useState('default')
   const [triggers, setTriggers] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [goal, setGoal] = useState('')
   const [sessionColor, setSessionColor] = useState('')
   const [editModel, setEditModel] = useState(INHERIT_MODEL)
   const [editEffort, setEditEffort] = useState('')
@@ -457,6 +461,7 @@ export function useCrewEditor(args: UseCrewEditorArgs): CrewEditorController {
     setKiroAgent(a.kiro_agent); setWorkspace(a.workspace); setMemoryStore(a.memory_store)
     setTriggers(a.triggers || '')
     setDisplayName(a.display_name || '')
+    setGoal(a.goal || '')
     setSessionColor(a.session_color || '')
     setEditModel(a.model || INHERIT_MODEL)
     setEditEffort(a.reasoning_effort || '')
@@ -698,6 +703,7 @@ export function useCrewEditor(args: UseCrewEditorArgs): CrewEditorController {
         model: editModel,
         reasoning_effort: editEffort,
         session_color: sessionColor,
+        goal,
       }
       let avatarPayload: CrewAvatarOverride | Record<string, unknown> | null = avatarReset
         ? null
@@ -850,6 +856,7 @@ export function useCrewEditor(args: UseCrewEditorArgs): CrewEditorController {
     if (editEffort !== (editingAgent.reasoning_effort || '')) out.add('model')
     if (triggers !== (editingAgent.triggers || '')) out.add('routing')
     if (displayName.trim() !== (editingAgent.display_name || '').trim()) out.add('routing')
+    if (goal !== (editingAgent.goal || '')) out.add('overview')
     if (sessionColor !== (editingAgent.session_color || '')) out.add('routing')
     const savedNorm =
       ghostTraitsFrom(editingAgent.avatar) ??
@@ -876,7 +883,7 @@ export function useCrewEditor(args: UseCrewEditorArgs): CrewEditorController {
     if (schedDraft) out.add('schedules')
     if (capabilityDirty) out.add('capabilities')
     return out
-  }, [editingAgent, kiroAgent, workspace, memoryStore, editModel, editEffort, triggers, displayName, sessionColor, schedDraft, editAvatar, capabilityDirty])
+  }, [editingAgent, kiroAgent, workspace, memoryStore, editModel, editEffort, triggers, displayName, goal, sessionColor, schedDraft, editAvatar, capabilityDirty])
 
   const requestPane = useCallback((key: CrewPaneKey) => {
     if (schedDraft && key !== pane) { setDiscardAsk(key); return }
@@ -1058,6 +1065,7 @@ export function useCrewEditor(args: UseCrewEditorArgs): CrewEditorController {
     memoryStore,
     triggers, setTriggers,
     displayName, setDisplayName,
+    goal, setGoal,
     sessionColor, setSessionColor,
     editModel, setEditModel,
     editEffort, setEditEffort,

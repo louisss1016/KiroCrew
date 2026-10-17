@@ -304,6 +304,7 @@ def _agent_roster_row(
         # ``name`` above stays the row's identity and dispatch handle.
         "display_name": _roster_mask(agent_cfg.display_name),
         "description": _roster_mask(agent_cfg.description),
+        "goal": _roster_mask(agent_cfg.goal),
         "triggers": _roster_mask(agent_cfg.triggers),
         "source": _roster_mask(agent_cfg.source),
         "session_color": _roster_mask(agent_cfg.session_color),

@@ -465,6 +465,16 @@ async def api_kirocrew_agent_update(request: web.Request) -> web.Response:
         if "description" in body:
             agent.description = body["description"]
             changed.append("description")
+        if "goal" in body:
+            # Free-text, multi-line, string-only — same contract as description.
+            # "" is a real value: it clears the standing goal.
+            if not isinstance(body["goal"], str):
+                return web.json_response(
+                    {"error": "goal must be a string", "code": "invalid_goal"},
+                    status=400,
+                )
+            agent.goal = body["goal"]
+            changed.append("goal")
         if "display_name" in body:
             # Presentation only, but strictly a string: a non-string here would
             # be stored verbatim and then rendered by every roster surface.
